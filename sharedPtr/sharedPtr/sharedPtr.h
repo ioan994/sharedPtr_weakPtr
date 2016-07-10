@@ -5,9 +5,19 @@ class SharedPtr
 {
 public:
 
-   explicit SharedPtr(T* i_pointer = nullptr) : m_pointer(i_pointer), m_refCount(nullptr)
+   explicit SharedPtr(T* i_pointer = nullptr)
    {
-      if (m_pointer) addRef();
+      internalReset(i_pointer, nullptr);
+   }
+
+   SharedPtr(const SharedPtr& i_other)
+   {
+      internalReset(i_other.m_pointer, i_other.m_refCount);
+   }
+
+   SharedPtr(SharedPtr&& i_other)
+   {
+      *this = std::move(i_other);
    }
 
    ~SharedPtr()
@@ -15,18 +25,22 @@ public:
       removeRef();
    }
 
-   SharedPtr(const SharedPtr& i_other) 
-   {
-      *this = i_other;
-   }
-
    SharedPtr& operator = (const SharedPtr& i_other)
    {
       if (this != &i_other)
       {
-         m_refCount = i_other.m_refCount;
-         m_pointer = i_other.m_pointer;
-         if (m_pointer) addRef();
+         internalReset(i_other.m_pointer, i_other.m_refCount);
+      }
+      return *this;
+   }
+
+   SharedPtr& operator = (SharedPtr&& i_other)
+   {
+      if (this != &i_other)
+      {
+         removeRef();
+         setPointers(i_other.m_pointer, i_other.m_refCount);
+         i_other.setPointers(nullptr, nullptr);
       }
       return *this;
    }
@@ -43,10 +57,7 @@ public:
 
    void Reset(T* i_pointer = nullptr)
    {
-      removeRef();
-      m_refCount = nullptr;
-      m_pointer = i_pointer;
-      if (m_pointer)addRef();
+      internalReset(i_pointer, nullptr);
    }
 
    T* operator ->()
@@ -71,9 +82,22 @@ private:
       }
    }
 
+   void internalReset(T* i_pointer, long* i_refCount)
+   {
+      removeRef();
+      setPointers(i_pointer, i_refCount);
+      if (m_pointer)addRef();
+   }
+
+   void setPointers(T* i_pointer, long* i_refCount)
+   {
+      m_pointer = i_pointer;
+      m_refCount = i_refCount;
+   }
+
 private:
-   T* m_pointer;
-   long* m_refCount;
+   T* m_pointer = nullptr;
+   long* m_refCount = nullptr;
 };
 
 template <class ObjectType, class... ParamTypes>
