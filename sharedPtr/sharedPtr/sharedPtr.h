@@ -44,8 +44,14 @@ public:
    void Reset(T* i_pointer = nullptr)
    {
       removeRef();
+      m_refCount = nullptr;
       m_pointer = i_pointer;
       if (m_pointer)addRef();
+   }
+
+   T* operator ->()
+   {
+      return m_pointer;
    }
 
 private:
@@ -58,9 +64,20 @@ private:
    void removeRef()
    {
       if (m_refCount) --*m_refCount;
+      if (UseCount() == 0)
+      {
+         delete m_refCount;
+         delete m_pointer;
+      }
    }
 
 private:
    T* m_pointer;
    long* m_refCount;
 };
+
+template <class ObjectType, class... ParamTypes>
+SharedPtr<ObjectType> MakeShared(ParamTypes&&... i_params)
+{
+   return SharedPtr<ObjectType>(new ObjectType(std::forward<ParamTypes>(i_params)...));
+}
