@@ -5,7 +5,15 @@ class SharedPtr
 {
 public:
 
-   explicit SharedPtr(T* i_pointer = nullptr)
+   using element_type = T;
+
+   SharedPtr()
+   {
+      internalReset(nullptr, nullptr);
+   }
+
+   template<class TOther>
+   explicit SharedPtr(TOther* i_pointer)
    {
       internalReset(i_pointer, nullptr);
    }
@@ -15,9 +23,19 @@ public:
       internalReset(i_other.m_pointer, i_other.m_refCount);
    }
 
+   template<class TOther, class = std::enable_if_t<std::is_convertible<TOther*, T*>::value>>
+   SharedPtr(const SharedPtr<TOther>& i_other)
+   {
+      internalReset(i_other.Get(), i_other.GetRefCount());
+   }
+
    SharedPtr(SharedPtr&& i_other)
    {
       *this = std::move(i_other);
+   }
+
+   SharedPtr(nullptr_t) : SharedPtr()
+   {
    }
 
    ~SharedPtr()
@@ -31,6 +49,13 @@ public:
       {
          internalReset(i_other.m_pointer, i_other.m_refCount);
       }
+      return *this;
+   }
+
+   template<class TOther>
+   SharedPtr& operator=(const SharedPtr<TOther>& i_other)
+   {
+      internalReset(i_other.Get(), i_other.GetRefCount());
       return *this;
    }
 
@@ -58,6 +83,17 @@ public:
    void Reset(T* i_pointer = nullptr)
    {
       internalReset(i_pointer, nullptr);
+   }
+
+   void swap(SharedPtr& i_other)
+   {
+      std::swap(m_pointer, i_other.m_pointer);
+      std::swap(m_refCount, i_other.m_refCount);
+   }
+
+   long* GetRefCount() const
+   {
+      return m_refCount;
    }
 
    T* operator ->()

@@ -8,7 +8,12 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace
 {
-   struct DummyWithDestructor
+   struct Dummy
+   {
+      virtual ~Dummy() = default;
+   };
+
+   struct DummyWithDestructor : public Dummy
    {
       DummyWithDestructor(bool& i_destructorCalled) : m_destructorCalled(i_destructorCalled)
       {
@@ -140,8 +145,8 @@ namespace test
 
          shared = std::move(shared);
 
-         Assert::IsTrue(shared.UseCount(), L"Use count is not one.");
-         Assert::IsFalse(destructorCalled);
+         Assert::IsTrue(shared.UseCount() == 1, L"Use count is not one.");
+         Assert::IsFalse(destructorCalled, L"Destructor was called.");
       }
 
       TEST_METHOD(TestMemberAccesss)
@@ -254,6 +259,57 @@ namespace test
          Assert::IsTrue(sharedPtr1.UseCount() == 0, L"Use count is not zero for first sharedPtr.");
          Assert::IsTrue(sharedPtr2.UseCount() == 0, L"Use count is not zero for second sharedPtr.");
          Assert::IsTrue(destructorCalled, L"Destructor was not called.");
+      }
+
+      TEST_METHOD(TestCanBeUsedWithDerivedClassPointer)
+      {
+         bool destructorCalled = false;
+
+         {
+            SharedPtr<Dummy> sharedPtr(new DummyWithDestructor(destructorCalled));
+         }
+
+         Assert::IsTrue(destructorCalled);
+      }
+
+      TEST_METHOD(TestMoveConstructructedSharesOwnershipWithSharedPtrWithDerivedClassPointer)
+      {
+         bool unused = false;
+         SharedPtr<DummyWithDestructor> sharedPtr = MakeShared<DummyWithDestructor>(unused);
+         SharedPtr<Dummy> sharedPtr2 = sharedPtr;
+
+         Assert::IsTrue(sharedPtr.UseCount() == 2);
+         Assert::IsTrue(sharedPtr2.UseCount() == 2);
+         Assert::IsTrue(sharedPtr.Get() == sharedPtr2.Get());
+      }
+
+      TEST_METHOD(TestCopyConstructructedSharesOwnershipWithSharedPtrWithDerivedClassPointer)
+      {
+         bool unused = false;
+         SharedPtr<DummyWithDestructor> sharedPtr = MakeShared<DummyWithDestructor>(unused);
+         SharedPtr<Dummy> sharedPtr2;
+
+         sharedPtr2 = sharedPtr;
+
+         Assert::IsTrue(sharedPtr.UseCount() == 2);
+         Assert::IsTrue(sharedPtr2.UseCount() == 2);
+         Assert::IsTrue(sharedPtr.Get() == sharedPtr2.Get());
+      }
+
+      TEST_METHOD(TestSwap)
+      {
+         int* ptr1 = new int;
+         int* ptr2 = new int;
+         SharedPtr<int> shared1(ptr1);
+         auto shared2 = shared1;
+         SharedPtr<int> shared3(ptr2);
+
+         shared2.swap(shared3);
+
+         Assert::IsTrue(shared2.Get() == ptr2);
+         Assert::IsTrue(shared3.Get() == ptr1);
+         Assert::IsTrue(shared2.UseCount() == 1);
+         Assert::IsTrue(shared3.UseCount() == 2);
       }
 
 	};
