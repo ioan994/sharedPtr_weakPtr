@@ -8,18 +8,18 @@ using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
 namespace
 {
-   struct Dummy
+   struct dummy
    {
-      virtual ~Dummy() = default;
+      virtual ~dummy() = default;
    };
 
-   struct DummyWithDestructor : public Dummy
+   struct dummy_with_destructor : public dummy
    {
-      DummyWithDestructor(bool& i_destructorCalled) : m_destructorCalled(i_destructorCalled)
+      dummy_with_destructor(bool& i_destructorCalled) : m_destructorCalled(i_destructorCalled)
       {
       }
 
-      ~DummyWithDestructor()
+      ~dummy_with_destructor()
       {
          m_destructorCalled = true;
       }
@@ -37,82 +37,82 @@ namespace test
 		TEST_METHOD(TestSharedPtrStorePointer)
 		{
          int* ptr = new int;
-         SharedPtr<int> sharedPtr(ptr);
+         shared_ptr<int> shared_ptr(ptr);
 
-         Assert::AreEqual(ptr, sharedPtr.Get());
+         Assert::AreEqual(ptr, shared_ptr.get());
 		}
 
       TEST_METHOD(TestSharedPtrInitWithNull)
       {
-         SharedPtr<int> sharedPtr;
+         shared_ptr<int> shared_ptr;
 
-         Assert::IsNull(sharedPtr.Get());
+         Assert::IsNull(shared_ptr.get());
       }
 
       TEST_METHOD(TestUseCountIsZeroForNullOneForNotNull)
       {
-         SharedPtr<int> sharedPtrNull;
-         SharedPtr<int> sharedPtrNotNull(new int);
+         shared_ptr<int> sharedPtrNull;
+         shared_ptr<int> sharedPtrNotNull(new int);
 
-         Assert::IsTrue(sharedPtrNull.UseCount() == 0, L"Use count is not zero.");
-         Assert::IsTrue(sharedPtrNotNull.UseCount() == 1, L"Use count is not one");
+         Assert::IsTrue(sharedPtrNull.use_count() == 0, L"Use count is not zero.");
+         Assert::IsTrue(sharedPtrNotNull.use_count() == 1, L"Use count is not one");
       }
 
       TEST_METHOD(TestAssignCopyPointerIncreaseUseCount)
       {
-         SharedPtr<int> rhsSharedPtr(new int);
-         SharedPtr<int> lhsSharedPtr;
+         shared_ptr<int> rhsSharedPtr(new int);
+         shared_ptr<int> lhsSharedPtr;
 
          lhsSharedPtr = rhsSharedPtr;
 
-         Assert::AreEqual(lhsSharedPtr.Get(), rhsSharedPtr.Get(), L"Objects store different pointers.");
-         Assert::IsTrue(lhsSharedPtr.UseCount() == 2, L"Use count for left hand side pointer does not equal to two.");
-         Assert::IsTrue(rhsSharedPtr.UseCount() == 2, L"Use count for right hand side pointer does not equal to two.");
+         Assert::AreEqual(lhsSharedPtr.get(), rhsSharedPtr.get(), L"Objects store different pointers.");
+         Assert::IsTrue(lhsSharedPtr.use_count() == 2, L"Use count for left hand side pointer does not equal to two.");
+         Assert::IsTrue(rhsSharedPtr.use_count() == 2, L"Use count for right hand side pointer does not equal to two.");
       }
 
       TEST_METHOD(TestAssignWithNullDoesNotIncreaseUseCount)
       {
-         SharedPtr<int> rhsSharedPtr;
-         SharedPtr<int> lhsSharedPtr;
+         shared_ptr<int> rhsSharedPtr;
+         shared_ptr<int> lhsSharedPtr;
 
          lhsSharedPtr = rhsSharedPtr;
 
-         Assert::IsTrue(lhsSharedPtr.UseCount() == 0, L"Use count for left hand side pointer does not equal to zero.");
-         Assert::IsTrue(rhsSharedPtr.UseCount() == 0, L"Use count for right hand side pointer does not equal to zero.");
+         Assert::IsTrue(lhsSharedPtr.use_count() == 0, L"Use count for left hand side pointer does not equal to zero.");
+         Assert::IsTrue(rhsSharedPtr.use_count() == 0, L"Use count for right hand side pointer does not equal to zero.");
       }
 
       TEST_METHOD(TestSelfAssignDoesNotIncreaseUseCount)
       {
-         SharedPtr<int> sharedPtr(new int);
+         shared_ptr<int> sharedPtr(new int);
 
          sharedPtr = sharedPtr;
 
-         Assert::IsTrue(sharedPtr.UseCount() == 1);
+         Assert::IsTrue(sharedPtr.use_count() == 1);
       }
 
       TEST_METHOD(TestCopyConstructCopyPointerIncreaseUseCount)
       {
-         SharedPtr<int> rhsSharedPtr(new int);
+         shared_ptr<int> rhsSharedPtr(new int);
 
-         SharedPtr<int> lhsSharedPtr = rhsSharedPtr;
+         shared_ptr<int> lhsSharedPtr = rhsSharedPtr;
 
-         Assert::AreEqual(lhsSharedPtr.Get(), rhsSharedPtr.Get(), L"Objects store different pointers.");
-         Assert::IsTrue(lhsSharedPtr.UseCount() == 2, L"Use count for left hand side pointer does not equal to two.");
-         Assert::IsTrue(rhsSharedPtr.UseCount() == 2, L"Use count for right hand side pointer does not equal to two.");
+         Assert::AreEqual(lhsSharedPtr.get(), rhsSharedPtr.get(), L"Objects store different pointers.");
+         Assert::IsTrue(lhsSharedPtr.use_count() == 2, L"Use count for left hand side pointer does not equal to two.");
+         Assert::IsTrue(rhsSharedPtr.use_count() == 2, L"Use count for right hand side pointer does not equal to two.");
       }
 
       TEST_METHOD(TestMoveConstruct)
       {
          bool destructorCalled = false;
-         DummyWithDestructor* dummy = new DummyWithDestructor(destructorCalled);
-         SharedPtr<DummyWithDestructor> rhsSharedPtr(dummy);
+         dummy_with_destructor* dummy = new dummy_with_destructor(destructorCalled);
+         shared_ptr<dummy_with_destructor> rhsSharedPtr(dummy);
 
          auto lhsSharedPtr = std::move(rhsSharedPtr);
 
-         Assert::IsNull(rhsSharedPtr.Get(), L"Right hand side object holds pointer.");
-         Assert::IsTrue(rhsSharedPtr.UseCount() == 0, L"Use count for right hand side object is not zero.");
-         Assert::IsTrue(lhsSharedPtr.Get() == dummy, L"Pointer was not transferred correctly.");
-         Assert::IsTrue(lhsSharedPtr.UseCount() == 1, L"Left hand side object has incorrect use count value.");
+         Assert::IsNull(rhsSharedPtr.get(), L"Right hand side object holds pointer.");
+         Assert::IsTrue(rhsSharedPtr.use_count() == 0, L"Use count for right hand side object is not zero.");
+         Assert::IsTrue(lhsSharedPtr.get() == dummy, L"Pointer was not transferred correctly.");
+         Assert::IsTrue(lhsSharedPtr.use_count() == 1, L"Left hand side object has incorrect use count value.");
          Assert::IsFalse(destructorCalled, L"Destructor was called.");
       }
 
@@ -120,20 +120,20 @@ namespace test
       {
          // Shared 1 and shared 2 share the same pointer. Shared 3 holds different pointer.
          bool destructorCalled1 = false;
-         auto shared1 = MakeShared<DummyWithDestructor>(destructorCalled1);
+         auto shared1 = make_shared<dummy_with_destructor>(destructorCalled1);
          auto shared2 = shared1;
          bool destructorCalled3 = false;
-         auto dummy3 = new DummyWithDestructor(destructorCalled3);
-         SharedPtr<DummyWithDestructor> shared3(dummy3);
+         auto dummy3 = new dummy_with_destructor(destructorCalled3);
+         shared_ptr<dummy_with_destructor> shared3(dummy3);
 
          // Pointer from shared 3 object moves to shared 2. Causes decreasing of use count for shared 1.
          shared2 = std::move(shared3);
 
-         Assert::IsTrue(shared1.UseCount() == 1, L"Use count for shared1 is not one.");
-         Assert::IsTrue(shared2.Get() == dummy3, L"Pointer was not moved from shared3 to shared2.");
-         Assert::IsTrue(shared2.UseCount() == 1, L"Use count for shared2 is not one.");
-         Assert::IsNull(shared3.Get(), L"shared3 still holds pointer.");
-         Assert::IsTrue(shared3.UseCount() == 0, L"Use count for shared3 is not zero.");
+         Assert::IsTrue(shared1.use_count() == 1, L"Use count for shared1 is not one.");
+         Assert::IsTrue(shared2.get() == dummy3, L"Pointer was not moved from shared3 to shared2.");
+         Assert::IsTrue(shared2.use_count() == 1, L"Use count for shared2 is not one.");
+         Assert::IsNull(shared3.get(), L"shared3 still holds pointer.");
+         Assert::IsTrue(shared3.use_count() == 0, L"Use count for shared3 is not zero.");
          Assert::IsFalse(destructorCalled1, L"Destructor was called for pointer stored in shared1 and shared2.");
          Assert::IsFalse(destructorCalled3, L"Destructor was called for pointer stored in shared3.");
       }
@@ -141,11 +141,11 @@ namespace test
       TEST_METHOD(TestSelfMoveDoesNothing)
       {
          bool destructorCalled = false;
-         auto shared = MakeShared<DummyWithDestructor>(destructorCalled);
+         auto shared = make_shared<dummy_with_destructor>(destructorCalled);
 
          shared = std::move(shared);
 
-         Assert::IsTrue(shared.UseCount() == 1, L"Use count is not one.");
+         Assert::IsTrue(shared.use_count() == 1, L"Use count is not one.");
          Assert::IsFalse(destructorCalled, L"Destructor was called.");
       }
 
@@ -153,7 +153,7 @@ namespace test
       {
          using BoolInt = std::pair<bool, int>;
          BoolInt testPair(true, 42);
-         SharedPtr<BoolInt> sharedPtr(new BoolInt(testPair));
+         shared_ptr<BoolInt> sharedPtr(new BoolInt(testPair));
 
          Assert::IsTrue(sharedPtr->first == testPair.first);
          Assert::IsTrue(sharedPtr->second == testPair.second);
@@ -165,7 +165,7 @@ namespace test
          const bool boolParam = true;
          const int intParam = 42;
 
-         auto sharedPtr = MakeShared<BoolInt>(boolParam, intParam);
+         auto sharedPtr = make_shared<BoolInt>(boolParam, intParam);
 
          Assert::IsTrue(sharedPtr->first == boolParam);
          Assert::IsTrue(sharedPtr->second == intParam);
@@ -174,50 +174,50 @@ namespace test
       TEST_METHOD(TestGoingOutOfScopeDecreasesRefCount)
       {
          bool destructorCalled = false;
-         auto sharedPtr1 = MakeShared<DummyWithDestructor>(destructorCalled);
+         auto sharedPtr1 = make_shared<dummy_with_destructor>(destructorCalled);
 
          {
             auto sharedPtr2 = sharedPtr1;
          }
 
-         Assert::IsTrue(sharedPtr1.UseCount() == 1, L"Use count is not one.");
+         Assert::IsTrue(sharedPtr1.use_count() == 1, L"Use count is not one.");
          Assert::IsFalse(destructorCalled, L"Destructor was called.");
       }
 
-      TEST_METHOD(TestResetWithPointerSetsPointerAndSetRefCountToOneForNewPointer)
+      TEST_METHOD(TestresetWithPointerSetsPointerAndSetRefCountToOneForNewPointer)
       {
          bool destructorCalledShared1 = false;
-         auto sharedPtr1 = MakeShared<DummyWithDestructor>(destructorCalledShared1);
+         auto sharedPtr1 = make_shared<dummy_with_destructor>(destructorCalledShared1);
          auto sharedPtr2 = sharedPtr1;
          bool unused = false;
-         DummyWithDestructor* newDummy = new DummyWithDestructor(unused);
+         dummy_with_destructor* newdummy = new dummy_with_destructor(unused);
 
-         sharedPtr2.Reset(newDummy);
+         sharedPtr2.reset(newdummy);
 
-         Assert::IsTrue(sharedPtr1.UseCount() == 1, L"Use count for first object is not one.");
-         Assert::IsTrue(sharedPtr2.UseCount() == 1, L"Use count for second object is not one.");
-         Assert::IsTrue(newDummy == sharedPtr2.Get(), L"Poiner is not reset.");
+         Assert::IsTrue(sharedPtr1.use_count() == 1, L"Use count for first object is not one.");
+         Assert::IsTrue(sharedPtr2.use_count() == 1, L"Use count for second object is not one.");
+         Assert::IsTrue(newdummy == sharedPtr2.get(), L"Poiner is not reset.");
          Assert::IsFalse(destructorCalledShared1, L"Destructor was called.");
       }
 
       TEST_METHOD(TestAssignDecreaseUseCountForPreviousPointer)
       {
-         auto sharedPtr1 = MakeShared<int>(42);
+         auto sharedPtr1 = make_shared<int>(42);
          auto sharedPtr2 = sharedPtr1;
-         auto sharedPtr3 = MakeShared<int>(0);
+         auto sharedPtr3 = make_shared<int>(0);
          
          sharedPtr2 = sharedPtr3;
 
-         Assert::IsTrue(sharedPtr1.UseCount() == 1, L"Use count for firs object is not one.");
-         Assert::IsTrue(sharedPtr2.UseCount() == 2, L"Use count for second object is not two.");
+         Assert::IsTrue(sharedPtr1.use_count() == 1, L"Use count for firs object is not one.");
+         Assert::IsTrue(sharedPtr2.use_count() == 2, L"Use count for second object is not two.");
       }
 
       TEST_METHOD(TestAssignCausesDestructorCallWhenUseCountReachesZero)
       {
          bool destructorCalled = false;
          bool unused;
-         auto lhsSharedPtr = MakeShared<DummyWithDestructor>(destructorCalled);
-         auto rhsSharedPtr = MakeShared<DummyWithDestructor>(unused);
+         auto lhsSharedPtr = make_shared<dummy_with_destructor>(destructorCalled);
+         auto rhsSharedPtr = make_shared<dummy_with_destructor>(unused);
          
          lhsSharedPtr = rhsSharedPtr;
 
@@ -228,9 +228,9 @@ namespace test
       {
          bool destructorCalled = false;
          bool unused;
-         auto lhsSharedPtr = MakeShared<DummyWithDestructor>(destructorCalled);
+         auto lhsSharedPtr = make_shared<dummy_with_destructor>(destructorCalled);
 
-         lhsSharedPtr = MakeShared<DummyWithDestructor>(unused);
+         lhsSharedPtr = make_shared<dummy_with_destructor>(unused);
 
          Assert::IsTrue(destructorCalled);
       }
@@ -240,24 +240,24 @@ namespace test
          bool destructorCalled = false;
 
          {
-            auto sharedPtr1 = MakeShared<DummyWithDestructor>(destructorCalled);
+            auto sharedPtr1 = make_shared<dummy_with_destructor>(destructorCalled);
             auto sharedPtr2 = sharedPtr1;
          }
 
          Assert::IsTrue(destructorCalled);
       }
 
-      TEST_METHOD(TestResetWithNullDropUseCountToZeroAndCallsDestructor)
+      TEST_METHOD(TestresetWithNullDropUseCountToZeroAndCallsDestructor)
       {
          bool destructorCalled = false;
-         auto sharedPtr1 = MakeShared<DummyWithDestructor>(destructorCalled);
+         auto sharedPtr1 = make_shared<dummy_with_destructor>(destructorCalled);
          auto sharedPtr2 = sharedPtr1;
 
-         sharedPtr1.Reset();
-         sharedPtr2.Reset();
+         sharedPtr1.reset();
+         sharedPtr2.reset();
 
-         Assert::IsTrue(sharedPtr1.UseCount() == 0, L"Use count is not zero for first sharedPtr.");
-         Assert::IsTrue(sharedPtr2.UseCount() == 0, L"Use count is not zero for second sharedPtr.");
+         Assert::IsTrue(sharedPtr1.use_count() == 0, L"Use count is not zero for first shared_ptr.");
+         Assert::IsTrue(sharedPtr2.use_count() == 0, L"Use count is not zero for second shared_ptr.");
          Assert::IsTrue(destructorCalled, L"Destructor was not called.");
       }
 
@@ -266,7 +266,7 @@ namespace test
          bool destructorCalled = false;
 
          {
-            SharedPtr<Dummy> sharedPtr(new DummyWithDestructor(destructorCalled));
+            shared_ptr<dummy> sharedPtr(new dummy_with_destructor(destructorCalled));
          }
 
          Assert::IsTrue(destructorCalled);
@@ -275,41 +275,85 @@ namespace test
       TEST_METHOD(TestMoveConstructructedSharesOwnershipWithSharedPtrWithDerivedClassPointer)
       {
          bool unused = false;
-         SharedPtr<DummyWithDestructor> sharedPtr = MakeShared<DummyWithDestructor>(unused);
-         SharedPtr<Dummy> sharedPtr2 = sharedPtr;
+         shared_ptr<dummy_with_destructor> sharedPtr = make_shared<dummy_with_destructor>(unused);
+         shared_ptr<dummy> sharedPtr2 = sharedPtr;
 
-         Assert::IsTrue(sharedPtr.UseCount() == 2);
-         Assert::IsTrue(sharedPtr2.UseCount() == 2);
-         Assert::IsTrue(sharedPtr.Get() == sharedPtr2.Get());
+         Assert::IsTrue(sharedPtr.use_count() == 2);
+         Assert::IsTrue(sharedPtr2.use_count() == 2);
+         Assert::IsTrue(sharedPtr.get() == sharedPtr2.get());
       }
 
       TEST_METHOD(TestCopyConstructructedSharesOwnershipWithSharedPtrWithDerivedClassPointer)
       {
          bool unused = false;
-         SharedPtr<DummyWithDestructor> sharedPtr = MakeShared<DummyWithDestructor>(unused);
-         SharedPtr<Dummy> sharedPtr2;
+         shared_ptr<dummy_with_destructor> sharedPtr = make_shared<dummy_with_destructor>(unused);
+         shared_ptr<dummy> sharedPtr2;
 
          sharedPtr2 = sharedPtr;
 
-         Assert::IsTrue(sharedPtr.UseCount() == 2);
-         Assert::IsTrue(sharedPtr2.UseCount() == 2);
-         Assert::IsTrue(sharedPtr.Get() == sharedPtr2.Get());
+         Assert::IsTrue(sharedPtr.use_count() == 2);
+         Assert::IsTrue(sharedPtr2.use_count() == 2);
+         Assert::IsTrue(sharedPtr.get() == sharedPtr2.get());
       }
 
       TEST_METHOD(TestSwap)
       {
          int* ptr1 = new int;
          int* ptr2 = new int;
-         SharedPtr<int> shared1(ptr1);
+         shared_ptr<int> shared1(ptr1);
          auto shared2 = shared1;
-         SharedPtr<int> shared3(ptr2);
+         shared_ptr<int> shared3(ptr2);
 
          shared2.swap(shared3);
 
-         Assert::IsTrue(shared2.Get() == ptr2);
-         Assert::IsTrue(shared3.Get() == ptr1);
-         Assert::IsTrue(shared2.UseCount() == 1);
-         Assert::IsTrue(shared3.UseCount() == 2);
+         Assert::IsTrue(shared2.get() == ptr2);
+         Assert::IsTrue(shared3.get() == ptr1);
+         Assert::IsTrue(shared2.use_count() == 1);
+         Assert::IsTrue(shared3.use_count() == 2);
+      }
+
+      TEST_METHOD(TestBoolConversion)
+      {
+         shared_ptr<int> empty;
+         shared_ptr<int> notEmpry(new int);
+
+         Assert::IsFalse(static_cast<bool>(empty));
+         Assert::IsTrue(static_cast<bool>(notEmpry));
+      }
+
+      TEST_METHOD(TestUnique)
+      {
+         auto shared1 = make_shared<int>(0);
+         auto shared2 = shared1;
+
+         auto sharedUnique = make_shared<int>(0);
+
+         Assert::IsFalse(shared1.unique());
+         Assert::IsTrue(sharedUnique.unique());
+      }
+
+      TEST_METHOD(TestAliasingConstructor)
+      {
+         int value;
+         auto shared = make_shared<int>(0);
+         shared_ptr<int> aliasedConstructed(shared, &value);
+
+         Assert::IsTrue(shared.use_count() == 2);
+         Assert::IsTrue(aliasedConstructed.use_count() == 2);
+         Assert::IsTrue(aliasedConstructed.get() == &value);
+      }
+
+      TEST_METHOD(TestAliasingConstructorGoesOutOfScope)
+      {
+         bool destructorCalled = false;
+         auto sharedPtr = make_shared<dummy_with_destructor>(destructorCalled);
+         dummy dumm;
+         shared_ptr<dummy> aliasedConstructed(sharedPtr, &dumm);
+         sharedPtr.reset();
+
+         aliasedConstructed.reset();
+
+         Assert::IsTrue(destructorCalled);
       }
 
 	};

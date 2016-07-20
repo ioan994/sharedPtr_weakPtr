@@ -1,99 +1,149 @@
 #pragma once;
 
+struct control_block_base
+{
+   virtual ~control_block_base() = default;
+   virtual long& use_count() = 0;
+   virtual long use_count() const = 0;
+};
+
 template <class T>
-class SharedPtr
+struct control_block : public control_block_base
+{
+   control_block() {}
+
+   control_block(T* i_pointer) : m_pointer(i_pointer)
+   {
+   }
+
+   control_block(T* i_pointer, long i_refCount) : m_pointer(i_pointer), m_refCount(i_refCount)
+   {
+   }
+
+   ~control_block()
+   {
+      delete m_pointer;
+   }
+
+   virtual long& use_count() override
+   {
+      return m_refCount;
+   }
+
+   virtual long use_count() const override
+   {
+      return m_refCount;
+   }
+
+   T* m_pointer = nullptr;
+   long m_refCount = 0;
+};
+
+template <class T>
+class shared_ptr
 {
 public:
 
    using element_type = T;
 
-   SharedPtr()
+   shared_ptr()
    {
-      internalReset(nullptr, nullptr);
+      internal_reset(nullptr, nullptr);
    }
 
    template<class TOther>
-   explicit SharedPtr(TOther* i_pointer)
+   explicit shared_ptr(TOther* i_pointer)
    {
-      internalReset(i_pointer, nullptr);
+      internal_reset(i_pointer, nullptr);
    }
 
-   SharedPtr(const SharedPtr& i_other)
+   template<class TOther> 
+   shared_ptr(const shared_ptr<TOther>& i_otherShared, T* i_otherPtr)
    {
-      internalReset(i_other.m_pointer, i_other.m_refCount);
+      internal_reset(i_otherPtr, i_otherShared.get_control_block());
+   }
+
+   shared_ptr(const shared_ptr& i_other)
+   {
+      internal_reset(i_other.m_pointer, i_other.m_control_block);
    }
 
    template<class TOther, class = std::enable_if_t<std::is_convertible<TOther*, T*>::value>>
-   SharedPtr(const SharedPtr<TOther>& i_other)
+   shared_ptr(const shared_ptr<TOther>& i_other)
    {
-      internalReset(i_other.Get(), i_other.GetRefCount());
+      internal_reset(i_other.get(), i_other.get_control_block());
    }
 
-   SharedPtr(SharedPtr&& i_other)
+   shared_ptr(shared_ptr&& i_other)
    {
       *this = std::move(i_other);
    }
 
-   SharedPtr(nullptr_t) : SharedPtr()
+   shared_ptr(nullptr_t) : shared_ptr()
    {
    }
 
-   ~SharedPtr()
+   ~shared_ptr()
    {
-      removeRef();
+      remove_ref();
    }
 
-   SharedPtr& operator = (const SharedPtr& i_other)
+   shared_ptr& operator = (const shared_ptr& i_other)
    {
       if (this != &i_other)
       {
-         internalReset(i_other.m_pointer, i_other.m_refCount);
+         internal_reset(i_other.m_pointer, i_other.m_control_block);
       }
       return *this;
    }
 
    template<class TOther>
-   SharedPtr& operator=(const SharedPtr<TOther>& i_other)
+   shared_ptr& operator=(const shared_ptr<TOther>& i_other)
    {
-      internalReset(i_other.Get(), i_other.GetRefCount());
+      internal_reset(i_other.get(), i_other.get_control_block());
       return *this;
    }
 
-   SharedPtr& operator = (SharedPtr&& i_other)
+   shared_ptr& operator = (shared_ptr&& i_other)
    {
       if (this != &i_other)
       {
-         removeRef();
-         setPointers(i_other.m_pointer, i_other.m_refCount);
-         i_other.setPointers(nullptr, nullptr);
+         remove_ref();
+         set_pointers(i_other.m_pointer, i_other.m_control_block);
+         i_other.set_pointers(nullptr, nullptr);
       }
       return *this;
    }
 
-   T* Get() const
+   T* get() const
    {
       return m_pointer;
    }
 
-   long UseCount() const
+   long use_count() const
    {
-      return m_refCount ? *m_refCount : 0;
+      return m_control_block ? m_control_block->use_count() : 0;
    }
 
-   void Reset(T* i_pointer = nullptr)
+   void reset(T* i_pointer = nullptr)
    {
-      internalReset(i_pointer, nullptr);
+      internal_reset(i_pointer, nullptr);
    }
 
-   void swap(SharedPtr& i_other)
+   void swap(shared_ptr& i_other)
    {
       std::swap(m_pointer, i_other.m_pointer);
-      std::swap(m_refCount, i_other.m_refCount);
+      std::swap(m_control_block, i_other.m_control_block);
    }
 
-   long* GetRefCount() const
+   control_block_base* get_control_block() const
    {
-      return m_refCount;
+      return m_control_block;
+   }
+
+   bool unique()
+   {
+      return use_count() == 1;
    }
 
    T* operator ->()
@@ -101,43 +151,51 @@ public:
       return m_pointer;
    }
 
-private:
-   void addRef()
+   T& operator*()
    {
-      if (!m_refCount) m_refCount = new long(0);
-      ++*m_refCount;
+      return *m_pointer;
    }
 
-   void removeRef()
+   explicit operator bool()
    {
-      if (m_refCount) --*m_refCount;
-      if (UseCount() == 0)
+      return m_pointer != nullptr;
+   }
+
+private:
+   void add_ref()
+   {
+      if (!m_control_block) m_control_block = new control_block<T>(m_pointer);
+      ++m_control_block->use_count();
+   }
+
+   void remove_ref()
+   {
+      if (m_control_block && --m_control_block->use_count() == 0)
       {
-         delete m_refCount;
-         delete m_pointer;
+         delete m_control_block;
       }
    }
 
-   void internalReset(T* i_pointer, long* i_refCount)
+   void internal_reset(T* i_pointer, control_block_base* i_control_block)
    {
-      removeRef();
-      setPointers(i_pointer, i_refCount);
-      if (m_pointer)addRef();
+      remove_ref();
+      set_pointers(i_pointer, i_control_block);
+      if (m_pointer)add_ref();
    }
 
-   void setPointers(T* i_pointer, long* i_refCount)
+   void set_pointers(T* i_pointer, control_block_base* i_control_block)
    {
       m_pointer = i_pointer;
-      m_refCount = i_refCount;
+      m_control_block = i_control_block;
    }
 
 private:
    T* m_pointer = nullptr;
-   long* m_refCount = nullptr;
+   control_block_base* m_control_block = nullptr;
 };
 
 template <class ObjectType, class... ParamTypes>
-SharedPtr<ObjectType> MakeShared(ParamTypes&&... i_params)
+shared_ptr<ObjectType> make_shared(ParamTypes&&... i_params)
 {
-   return SharedPtr<ObjectType>(new ObjectType(std::forward<ParamTypes>(i_params)...));
+   return shared_ptr<ObjectType>(new ObjectType(std::forward<ParamTypes>(i_params)...));
 }
