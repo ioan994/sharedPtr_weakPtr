@@ -513,7 +513,7 @@ namespace test
          Assert::IsTrue(weak.use_count() == 2);
       }
 
-      TEST_METHOD(TestWeakPtrReportsZeroUseCountAfterDeletion)
+      TEST_METHOD(TestWeakPtrReportsZeroUseCountAfterDeletionOfShared)
       {
          bool destructorCalled = false;
          auto shared = make_shared<dummy_with_destructor>(destructorCalled);
@@ -640,7 +640,7 @@ namespace test
          Assert::IsTrue(weak.use_count() == 2);
       }
 
-      TEST_METHOD(TestLockThrowsIfUseCountZero)
+      TEST_METHOD(TestLockReturnEmptyPointerIfCountZero)
       {
          weak_ptr<int> weak;
          auto shared = make_shared<int>();
@@ -648,8 +648,13 @@ namespace test
 
          shared.reset();
 
-         Assert::ExpectException<bad_weak_ptr>([&weak](){weak.lock(); });
-         Assert::ExpectException<bad_weak_ptr>([&weak2](){weak2.lock(); });
+         auto locked = weak.lock();
+         auto locked2 = weak2.lock();
+
+         Assert::IsTrue(locked.get() == nullptr);
+         Assert::IsTrue(locked.use_count() == 0);
+         Assert::IsTrue(locked2.get() == nullptr);
+         Assert::IsTrue(locked2.use_count() == 0);
       }
 
       TEST_METHOD(TestConstructSharedPtrFromWeak)
@@ -663,6 +668,17 @@ namespace test
          Assert::IsTrue(sharedFromWeak.use_count() == 2);
          Assert::IsTrue(shared.use_count() == 2);
          Assert::IsTrue(weak.use_count() == 2);
+      }
+
+      TEST_METHOD(TestConstructSharedPtrFromWeakThrowsIfWeakExpired)
+      {
+         weak_ptr<int> weak;
+         auto shared = make_shared<int>();
+         weak_ptr<int> weak2 = shared;
+         shared.reset();
+
+         Assert::ExpectException<bad_weak_ptr>([&weak](){shared_ptr<int> shared(weak); });
+         Assert::ExpectException<bad_weak_ptr>([&weak2](){shared_ptr<int> shared(weak2); });
       }
 
       TEST_METHOD(TestMultithreadingWeakPtrAccess)

@@ -172,7 +172,8 @@ public:
    template<class TOther>
    explicit shared_ptr(const weak_ptr<TOther>& i_other)
    {
-      *this = i_other.lock();
+      if (i_other.expired()) throw bad_weak_ptr();
+      internal_reset(i_other.get_ptr(), i_other.get_control_block());
    }
 
    shared_ptr(nullptr_t) : shared_ptr()
@@ -532,10 +533,7 @@ public:
 
    shared_ptr<T> lock() const
    {
-      if (expired()) throw bad_weak_ptr();
-      shared_ptr<T> shared;
-      shared.internal_reset(m_pointer, m_controlBlock);
-      return shared;
+      return expired() ? shared_ptr<T>() : shared_ptr<T>(*this);
    }
 
    control_block_base* get_control_block() const
