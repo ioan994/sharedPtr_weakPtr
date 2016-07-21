@@ -210,6 +210,12 @@ public:
       return *this;
    }
 
+   void swap(shared_ptr& i_other)
+   {
+      std::swap(m_pointer, i_other.m_pointer);
+      std::swap(m_controlBlock, i_other.m_controlBlock);
+   }
+
    void reset()
    {
       shared_ptr().swap(*this);
@@ -257,12 +263,6 @@ public:
       return m_pointer != nullptr;
    }
 
-   void swap(shared_ptr& i_other)
-   {
-      std::swap(m_pointer, i_other.m_pointer);
-      std::swap(m_controlBlock, i_other.m_controlBlock);
-   }
-
    control_block_base* get_control_block() const
    {
       return m_controlBlock;
@@ -273,6 +273,18 @@ public:
       remove_ref();
       set_pointers(i_pointer, i_controlBlock);
       if (m_pointer)add_ref();
+   }
+
+   template<class TOther>
+   bool owner_before(shared_ptr<TOther> const& i_other) const
+   {
+      return m_controlBlock < i_other.m_controlBlock;
+   }
+
+   template<class TOther>
+   bool owner_before(weak_ptr<TOther> const& i_other) const
+   {
+      return m_controlBlock < i_other.m_controlBlock;
    }
 
 private:

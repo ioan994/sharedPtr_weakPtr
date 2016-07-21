@@ -689,6 +689,5 @@ namespace test
          weak.reset();
          Assert::IsTrue(controlBlockDestructorCalled);
       }
-
 	};
 }
