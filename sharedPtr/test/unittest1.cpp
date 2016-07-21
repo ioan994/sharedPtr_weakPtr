@@ -52,6 +52,25 @@ namespace
       return shared;
    }
 
+   template < class T >
+   std::thread synchronize_start_thread(const T& i_callable)
+   {
+      std::promise<void> run;
+      std::promise<void> ready;
+
+      auto threadMethod = [&i_callable, &run, &ready]()
+      {
+         ready.set_value();
+         run.get_future().get();
+         i_callable();
+      };
+      std::thread worker(threadMethod);
+      ready.get_future().get();
+      run.set_value();
+
+      return worker;
+   }
+
 }
 
 namespace test
@@ -451,8 +470,6 @@ namespace test
       {
          bool destructorCalled = false;
          auto shared = make_shared<dummy_with_destructor>(destructorCalled);
-         std::promise<void> run;
-         std::promise<void> ready; 
          auto loop = [&shared]()
          {
             for (int i = 0; i < 100000; i++)
@@ -460,19 +477,11 @@ namespace test
                auto localShared = shared;
             }
          };
-         auto threadMethod = [&loop, &run, &ready]()
-         {
-            ready.set_value();
-            run.get_future().get();
-            loop();
-         };
-         std::thread worker(threadMethod);
-         ready.get_future().get();
-         run.set_value();
+         auto worker = synchronize_start_thread(loop);
 
          loop();
-
          worker.join();
+
          Assert::IsTrue(shared.use_count() == 1);
          Assert::IsFalse(destructorCalled);
       }
@@ -662,9 +671,6 @@ namespace test
          auto shared = get_shared_with_custom_control_block(controlBlockDestructorCalled, 0);
          weak_ptr<int> weak = shared;
          shared.reset();
-
-         std::promise<void> run;
-         std::promise<void> ready;
          auto loop = [&weak]()
          {
             for (int i = 0; i < 100000; i++)
@@ -672,15 +678,7 @@ namespace test
                auto localWeak = weak;
             }
          };
-         auto threadMethod = [&loop, &run, &ready]()
-         {
-            ready.set_value();
-            run.get_future().get();
-            loop();
-         };
-         std::thread worker(threadMethod);
-         ready.get_future().get();
-         run.set_value();
+         auto worker = synchronize_start_thread(loop);
 
          loop();
          worker.join();

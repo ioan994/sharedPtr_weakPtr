@@ -532,7 +532,7 @@ public:
 
    shared_ptr<T> lock() const
    {
-      if (use_count() == 0) throw bad_weak_ptr();
+      if (expired()) throw bad_weak_ptr();
       shared_ptr<T> shared;
       shared.internal_reset(m_pointer, m_controlBlock);
       return shared;
