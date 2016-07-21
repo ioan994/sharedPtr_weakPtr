@@ -554,11 +554,9 @@ private:
 
    void remove_weak_ref()
    {
-      if (m_controlBlock && --m_controlBlock->m_weakRefCount == 0)
-      {
-         delete m_controlBlock;
-         m_controlBlock = nullptr;
-      }
+      if (!m_controlBlock || --m_controlBlock->m_weakRefCount != 0) return;
+      if (m_controlBlock->m_refCount == 0) delete m_controlBlock;
+      m_controlBlock = nullptr;
    }
 
    void internal_reset(T* i_ptr, control_block_base* i_controlBlock)

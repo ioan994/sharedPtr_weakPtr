@@ -605,6 +605,7 @@ namespace test
       {
          bool controlBlockDestructorCalled = false;
          auto shared = get_shared_with_custom_control_block(controlBlockDestructorCalled, 0);
+         shared.reset();
          weak_ptr<int> weak = shared;
          weak_ptr<int> empty;
          
@@ -679,6 +680,19 @@ namespace test
 
          Assert::ExpectException<bad_weak_ptr>([&weak](){shared_ptr<int> shared(weak); });
          Assert::ExpectException<bad_weak_ptr>([&weak2](){shared_ptr<int> shared(weak2); });
+      }
+
+      TEST_METHOD(TestControlBlockIsNotDestroyedIfSharedPtrExist)
+      {
+         bool controlBlockDestructorCalled = false;
+         auto shared = get_shared_with_custom_control_block(controlBlockDestructorCalled, 0);
+         weak_ptr<int> weak = shared;
+         weak_ptr<int> empty;
+
+         weak = empty;
+
+         Assert::IsTrue(shared.use_count() == 1);
+         Assert::IsFalse(controlBlockDestructorCalled);
       }
 
       TEST_METHOD(TestMultithreadingWeakPtrAccess)
