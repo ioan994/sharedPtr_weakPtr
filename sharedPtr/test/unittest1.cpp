@@ -2,7 +2,8 @@
 #include "CppUnitTest.h"
 #include "sharedPtr.h"
 
-#include <memory>
+#include <thread>
+#include <future>
 
 using namespace Microsoft::VisualStudio::CppUnitTestFramework;
 
@@ -26,21 +27,46 @@ namespace
 
       bool& m_destructorCalled;
    };
+
+   template<class T>
+   struct control_block_with_destructor : public control_block<T>
+   {
+      control_block_with_destructor(T* i_pointer, bool& i_destructorCalled) : control_block(i_pointer), m_destructorCalled(i_destructorCalled)
+      {
+      }
+
+      ~control_block_with_destructor()
+      {
+         m_destructorCalled = true;
+      }
+
+      bool& m_destructorCalled;
+   };
+
+   template <class T>
+   shared_ptr<T> get_shared_with_custom_control_block(bool& i_controlBlockDestructorCalled, const T& i_val)
+   {
+      control_block_with_destructor<T>* controlBlock = new control_block_with_destructor<int>(new T(i_val), i_controlBlockDestructorCalled);
+      shared_ptr<int> shared;
+      shared.internal_reset(controlBlock->get(), controlBlock);
+      return shared;
+   }
+
 }
 
 namespace test
-{		
-	TEST_CLASS(SharedPtrTests)
-	{
-	public:
-		
-		TEST_METHOD(TestSharedPtrStorePointer)
-		{
+{
+   TEST_CLASS(SharedPtrTests)
+   {
+   public:
+
+      TEST_METHOD(TestSharedPtrStorePointer)
+      {
          int* ptr = new int;
          shared_ptr<int> shared_ptr(ptr);
 
          Assert::AreEqual(ptr, shared_ptr.get());
-		}
+      }
 
       TEST_METHOD(TestSharedPtrInitWithNull)
       {
@@ -351,9 +377,317 @@ namespace test
          shared_ptr<dummy> aliasedConstructed(sharedPtr, &dumm);
          sharedPtr.reset();
 
+         Assert::IsFalse(destructorCalled);
+
          aliasedConstructed.reset();
 
          Assert::IsTrue(destructorCalled);
+      }
+
+      TEST_METHOD(TestAliasingConstructorGoesOutOfScopeWithNull)
+      {
+         bool destructorCalled = false;
+         auto sharedPtr = make_shared<dummy_with_destructor>(destructorCalled);
+         shared_ptr<dummy> aliasedConstructed(sharedPtr, nullptr);
+         sharedPtr.reset();
+
+         Assert::IsFalse(destructorCalled);
+
+         aliasedConstructed.reset();
+
+         Assert::IsTrue(destructorCalled);
+      }
+
+      TEST_METHOD(TestCustomDestructorCalled)
+      {
+         bool destructorCalled = false;
+         auto deleter = [&destructorCalled](int* i_ptr)
+         {
+            destructorCalled = true;
+            delete i_ptr;
+         };
+
+         {
+            shared_ptr<int> shared(new int, deleter);
+         }
+
+         Assert::IsTrue(destructorCalled);
+      }
+
+      TEST_METHOD(TestDestructorNotCalledForNull)
+      {
+         bool destructorCalled = false;
+         auto deleter = [&destructorCalled](int* i_ptr)
+         {
+            destructorCalled = true;
+            delete i_ptr;
+         };
+
+         {
+            shared_ptr<int> shared(nullptr, deleter);
+         }
+
+         Assert::IsFalse(destructorCalled);
+      }
+
+      TEST_METHOD(TestResetWithDeleter)
+      {
+         bool destructorCalled = false;
+         auto deleter = [&destructorCalled](int* i_ptr)
+         {
+            destructorCalled = true;
+            delete i_ptr;
+         };
+
+         {
+            shared_ptr<int> shared;
+            shared.reset(new int, deleter);
+         }
+
+         Assert::IsTrue(destructorCalled);
+      }
+
+      TEST_METHOD(TestMultithreadingAccess)
+      {
+         bool destructorCalled = false;
+         auto shared = make_shared<dummy_with_destructor>(destructorCalled);
+         std::promise<void> run;
+         std::promise<void> ready; 
+         auto loop = [&shared]()
+         {
+            for (int i = 0; i < 100000; i++)
+            {
+               auto localShared = shared;
+            }
+         };
+         auto threadMethod = [&loop, &run, &ready]()
+         {
+            ready.set_value();
+            run.get_future().get();
+            loop();
+         };
+         std::thread worker(threadMethod);
+         ready.get_future().get();
+         run.set_value();
+
+         loop();
+
+         worker.join();
+         Assert::IsTrue(shared.use_count() == 1);
+         Assert::IsFalse(destructorCalled);
+      }
+
+      TEST_METHOD(TestWeakPtrInitWithZeroUseCount)
+      {
+         weak_ptr<int> weak;
+
+         Assert::IsTrue(weak.use_count() == 0);
+      }
+
+      TEST_METHOD(TestWeakPtrSharesOwnership)
+      {
+         auto shared = make_shared<int>();
+         auto shared2 = shared;
+         weak_ptr<int> weak(shared);
+
+         Assert::IsTrue(weak.use_count() == 2);
+      }
+
+      TEST_METHOD(TestWeakPtrSharesOwnershipAssign)
+      {
+         auto shared = make_shared<int>();
+         auto shared2 = shared;
+         weak_ptr<int> weak;
+
+         weak = shared;
+
+         Assert::IsTrue(weak.use_count() == 2);
+      }
+
+      TEST_METHOD(TestWeakPtrReportsZeroUseCountAfterDeletion)
+      {
+         bool destructorCalled = false;
+         auto shared = make_shared<dummy_with_destructor>(destructorCalled);
+         weak_ptr<dummy_with_destructor> weak(shared);
+
+         shared.reset();
+
+         Assert::IsTrue(weak.use_count() == 0, L"Use count is not zero.");
+         Assert::IsTrue(destructorCalled, L"Destructor was not called.");
+      }
+
+      TEST_METHOD(TestWeakPtrCopyingConstructed)
+      {
+         auto shared = make_shared<int>();
+         auto shared2 = shared;
+         weak_ptr<int> weak(shared);
+
+         auto weak2 = weak;
+
+         Assert::IsTrue(weak2.use_count() == 2);
+      }
+
+      TEST_METHOD(TestWeakPtrCopyAssign)
+      {
+         auto shared = make_shared<int>();
+         auto shared2 = shared;
+         weak_ptr<int> weak(shared);
+
+         weak_ptr<int> weak2;
+         weak2 = weak;
+
+         Assert::IsTrue(weak2.use_count() == 2);
+      }
+
+      TEST_METHOD(TestWeakPtrCopyAssignFromDerivedClassPointer)
+      {
+         bool notUsed = false;
+         auto shared = make_shared<dummy_with_destructor>(notUsed);
+         weak_ptr<dummy_with_destructor> weak(shared);
+         weak_ptr<dummy> weak2 = weak;
+
+         Assert::IsTrue(weak2.use_count() == 1);
+      }
+
+      TEST_METHOD(TestWeakPtrSwap)
+      {
+         auto shared = make_shared<int>();
+         weak_ptr<int> weakNotEmpty = shared;
+         weak_ptr<int> weakEmpty;
+
+         weakEmpty.swap(weakNotEmpty);
+
+         Assert::IsTrue(weakEmpty.use_count() == 1);
+         Assert::IsTrue(weakNotEmpty.use_count() == 0);
+      }
+
+      TEST_METHOD(TestWeakPtrReset)
+      {
+         auto shared = make_shared<int>();
+         weak_ptr<int> weak = shared;
+
+         weak.reset();
+
+         Assert::IsTrue(weak.use_count() == 0);
+      }
+
+      TEST_METHOD(TestControlBlockDestroyesAfterLastWeakPtrGone)
+      {
+         bool controlBlockDestructorCalled = false;
+         auto shared = get_shared_with_custom_control_block(controlBlockDestructorCalled, 0);
+
+         weak_ptr<int> weak = shared;
+         weak_ptr<int> weak2;
+         weak2 = weak;
+         shared.reset();
+
+         Assert::IsFalse(controlBlockDestructorCalled);
+
+         weak.reset();
+
+         Assert::IsFalse(controlBlockDestructorCalled);
+
+         weak2.reset();
+
+         Assert::IsTrue(controlBlockDestructorCalled);
+      }
+
+      TEST_METHOD(TestPreviousControlBlockDestroyesAfterCopying)
+      {
+         bool controlBlockDestructorCalled = false;
+         auto shared = get_shared_with_custom_control_block(controlBlockDestructorCalled, 0);
+         weak_ptr<int> weak = shared;
+         weak_ptr<int> empty;
+         
+         weak = empty;
+
+         Assert::IsTrue(controlBlockDestructorCalled);
+      }
+
+      TEST_METHOD(TestExpired)
+      {
+         weak_ptr<int> weakEmpty;
+         auto shared = make_shared<int>();
+         weak_ptr<int> weakNotEmpty = shared;
+         auto shared2 = make_shared<int>();
+         weak_ptr<int> weakNotEmptyButResetted = shared2;
+         shared2.reset();
+
+         Assert::IsTrue(weakEmpty.expired());
+         Assert::IsFalse(weakNotEmpty.expired());
+         Assert::IsTrue(weakNotEmptyButResetted.expired());
+      }
+
+      TEST_METHOD(TestLock)
+      {
+         auto shared = make_shared<int>();
+         weak_ptr<int> weak = shared;
+
+         auto sharedLocked = weak.lock();
+
+         Assert::IsTrue(sharedLocked.get() == shared.get());
+         Assert::IsTrue(sharedLocked.use_count() == 2);
+         Assert::IsTrue(shared.use_count() == 2);
+         Assert::IsTrue(weak.use_count() == 2);
+      }
+
+      TEST_METHOD(TestLockThrowsIfUseCountZero)
+      {
+         weak_ptr<int> weak;
+         auto shared = make_shared<int>();
+         weak_ptr<int> weak2 = shared;
+
+         shared.reset();
+
+         Assert::ExpectException<bad_weak_ptr>([&weak](){weak.lock(); });
+         Assert::ExpectException<bad_weak_ptr>([&weak2](){weak2.lock(); });
+      }
+
+      TEST_METHOD(TestConstructSharedPtrFromWeak)
+      {
+         auto shared = make_shared<int>();
+         weak_ptr<int> weak = shared;
+
+         shared_ptr<int> sharedFromWeak(weak);
+
+         Assert::IsTrue(sharedFromWeak.get() == shared.get());
+         Assert::IsTrue(sharedFromWeak.use_count() == 2);
+         Assert::IsTrue(shared.use_count() == 2);
+         Assert::IsTrue(weak.use_count() == 2);
+      }
+
+      TEST_METHOD(TestMultithreadingWeakPtrAccess)
+      {
+         bool controlBlockDestructorCalled = false;
+         auto shared = get_shared_with_custom_control_block(controlBlockDestructorCalled, 0);
+         weak_ptr<int> weak = shared;
+         shared.reset();
+
+         std::promise<void> run;
+         std::promise<void> ready;
+         auto loop = [&weak]()
+         {
+            for (int i = 0; i < 100000; i++)
+            {
+               auto localWeak = weak;
+            }
+         };
+         auto threadMethod = [&loop, &run, &ready]()
+         {
+            ready.set_value();
+            run.get_future().get();
+            loop();
+         };
+         std::thread worker(threadMethod);
+         ready.get_future().get();
+         run.set_value();
+
+         loop();
+         worker.join();
+
+         Assert::IsFalse(controlBlockDestructorCalled);
+         weak.reset();
+         Assert::IsTrue(controlBlockDestructorCalled);
       }
 
 	};
